@@ -46,6 +46,18 @@ app.post('/categories', async (req,res)=>{
     }
 })
 
+app.get('/games', async (req,res)=>{
+    try{
+        const query = await connection.query('SELECT * FROM games')
+        res.send(query.rows)
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
+
+
+
 app.listen(4000, ()=>{
     console.log("O servidor está rodando na porta 4000...")
 });
