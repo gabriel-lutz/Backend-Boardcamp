@@ -22,7 +22,26 @@ app.get('/categories', async (req,res)=>{
         const query = await connection.query('SELECT * FROM categories')
         res.send(query.rows)
     }catch(err){
-        consolçe.log(err)
+        console.log(err)
+        res.send(500)
+    }
+})
+
+app.post('/categories', async (req,res)=>{
+    try{
+        const newCategorie = req.body.name
+        const query = await connection.query('SELECT * FROM categories')
+        if(!newCategorie.length){
+            res.send(400)
+            return;
+        }else if(query.rows.length && query.rows.find(q => q.name === newCategorie)){
+            res.send(409);
+            return
+        }
+        await connection.query('INSERT INTO categories (name) VALUES ($1)', [newCategorie])
+        res.send(201)
+    }catch(err){
+        console.log(err)
         res.send(500)
     }
 })
