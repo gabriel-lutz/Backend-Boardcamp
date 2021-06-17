@@ -57,13 +57,13 @@ app.get('/games', async (req,res)=>{
                 FROM games JOIN categories
                 ON games."categoryId" = categories.id
                 WHERE name iLIKE  $1 || '%' `, [gamesToFilter])
-            res.send(query)
+            res.send(query.rows)
         }else{
             const query = await connection.query(`
                 SELECT games.*, categories.name AS "categoryName" 
                 FROM games JOIN categories
                 ON games."categoryId" = categories.id`)
-            res.send(query)
+            res.send(query.rows)
         }
     }catch(err){
         console.log(err)
@@ -74,7 +74,10 @@ app.get('/games', async (req,res)=>{
 app.post('/games', async (req,res)=>{
     try{
         const {name, image, stockTotal, categoryId, pricePerDay} = req.body
-        const gamesQuery = await connection.query(`SELECT * FROM games WHERE name = $1`, [name])
+        const gamesQuery = await connection.query(`
+            SELECT * 
+            FROM games 
+            WHERE name = $1`, [name])
         const categoriesQuery = await connection.query('SELECT * FROM categories')
         if(!name.length || stockTotal<=0 || pricePerDay <=0 || !categoriesQuery.rows.some(c=>c.id === categoryId)){
             res.send(401)
@@ -92,6 +95,26 @@ app.post('/games', async (req,res)=>{
     }
 })
 
+app.get('/customers', async (req,res)=>{
+    try{
+        const cpfToFilter = req.query.cpf
+        if(cpfToFilter){
+            const query = await connection.query(`
+                SELECT * FROM customers 
+                WHERE cpf = $1
+            `, [cpfToFilter+'%'])
+            res.send(query.rows)
+        }else{
+            const query = await connection.query(`
+                SELECT * FROM customers
+            `)
+            res.send(query.rows)
+        }
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
 
 
 app.listen(4000, ()=>{
