@@ -48,11 +48,45 @@ app.post('/categories', async (req,res)=>{
 
 app.get('/games', async (req,res)=>{
     try{
-        const query = await connection.query('SELECT * FROM games')
-        res.send(query.rows)
+        const categoriesQuery = await connection.query('SELECT * FROM categories')
+        const gamesToFilter = req.query.name
+        if(gamesToFilter){
+            const query = await connection.query("SELECT * FROM games WHERE name iLIKE  $1 || '%' ", [gamesToFilter])
+            const addedQuery = query.rows.map(q=> {
+                const categorie = categoriesQuery.rows.find(c => c.id === q.categoryId)
+                return {...q, categoryName: categorie.name }
+            } )
+            res.send(addedQuery)
+        }else{
+            const query = await connection.query('SELECT * FROM games')
+            const addedQuery = query.rows.map(q=> {
+                const categorie = categoriesQuery.rows.find(c => c.id === q.categoryId)
+                return {...q, categoryName: categorie.name }
+            } )
+            res.send(addedQuery)
+        }
     }catch(err){
         console.log(err)
         res.send(500)
+    }
+})
+
+app.post('/games', async (req,res)=>{
+    try{
+        const {name, image, stockTotal, categoryId, pricePerDay} = req.body
+        const gamesQuery = await connection.query("SELECT * FROM games WHERE name = $1", [name])
+        const categoriesQuery = await connection.query('SELECT * FROM categories')
+        if(!name.length || stockTotal<=0 || pricePerDay <=0 || !categoriesQuery.rows.some(c=>c.id === categoryId)){
+            res.send(401)
+            return;
+        }else if(gamesQuery.rows.length){
+            res.send(409)
+            return;
+        }
+        const query = await connection.query('INSERT INTO games (name, image, "stockTotal", "categoryId", "pricePerDay") VALUES ($1, $2, $3, $4, $5)', [name, image, stockTotal, categoryId, pricePerDay])
+        res.send(200)
+    }catch(err){
+        console.log(err)
     }
 })
 
