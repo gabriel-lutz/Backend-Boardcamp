@@ -88,7 +88,8 @@ app.post('/games', async (req,res)=>{
         }
         const query = await connection.query(`
             INSERT INTO games (name, image, "stockTotal", "categoryId", "pricePerDay") 
-            VALUES ($1, $2, $3, $4, $5)`, [name, image, stockTotal, categoryId, pricePerDay])
+            VALUES ($1, $2, $3, $4, $5)
+            `, [name, image, stockTotal, categoryId, pricePerDay])
         res.send(200)
     }catch(err){
         console.log(err)
@@ -110,6 +111,25 @@ app.get('/customers', async (req,res)=>{
             `)
             res.send(query.rows)
         }
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
+
+app.get('/customers/:id', async (req,res)=>{
+    try{
+        const id = req.params.id
+        const query = await connection.query(`
+            SELECT * 
+            FROM customers 
+            WHERE id = $1
+        `, [id])
+        if(!query.rows.length){
+            res.send(404)
+            return
+        }
+        res.send(query.rows)
     }catch(err){
         console.log(err)
         res.send(500)
