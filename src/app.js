@@ -58,7 +58,7 @@ app.get('/games', async (req,res)=>{
                 SELECT games.*, categories.name AS "categoryName" 
                 FROM games JOIN categories
                 ON games."categoryId" = categories.id
-                WHERE name iLIKE  $1 || '%' `, [gamesToFilter])
+                WHERE games.name iLIKE  $1 || '%' `, [gamesToFilter])
             res.send(query.rows)
         }else{
             const query = await connection.query(`
@@ -95,6 +95,7 @@ app.post('/games', async (req,res)=>{
         res.send(200)
     }catch(err){
         console.log(err)
+        res.send(500)
     }
 })
 
@@ -104,7 +105,7 @@ app.get('/customers', async (req,res)=>{
         if(cpfToFilter){
             const query = await connection.query(`
                 SELECT * FROM customers 
-                WHERE cpf = $1
+                WHERE cpf iLIKE $1
             `, [cpfToFilter+'%'])
             res.send(query.rows)
         }else{
@@ -252,7 +253,7 @@ app.get('/rentals', async (req,res)=>{
             const game = gameQuery.rows.find(g => g.id === r.gameId)
             const customer = customerQuery.rows.find(c=> c.id === r.customerId)
             return {...r, 
-                games:{id: game.id,
+                game:{id: game.id,
                        name: game.name,
                        categoryId: game.categoryId,
                        categoryName: game.categoryName
@@ -345,12 +346,12 @@ app.post('/rentals/:id/return', async (req,res)=>{
             return
         }
 
-        const returnDate = dayjs().format('YYYY-MM-DD')
+        const returnDate = dayjs().format('YYYY-MM-DD');
         let delayFee
         const d1 = new Date(query.rows[0].rentDate)
         const d2 = new Date()
         const daysPassedSinceRental = (d2.getTime() - d1.getTime())/86400000
-        
+
         if(query.rows[0].returnDate !== null){
             res.send(400)
             return
@@ -361,7 +362,6 @@ app.post('/rentals/:id/return', async (req,res)=>{
         }else{
             delayFee = '0'
         }
-
         await connection.query(`
             UPDATE rentals
             SET ("returnDate", "delayFee") = ($1,$2)
@@ -372,6 +372,30 @@ app.post('/rentals/:id/return', async (req,res)=>{
 
     }catch(err){
         console.log(err)
+        res.send(500)
+    }
+})
+
+app.delete('/rentals/:id', async (req, res)=>{
+    try{
+        const id  = req.params.id
+        const query = await connection.query(`
+            SELECT * from rentals WHERE id = $1
+        `, [id])
+
+        if(!query.rows.length || query.rows[0].returnDate !== null){
+            res.send(400)
+            return
+        }
+
+        await connection.query(`
+            DELETE FROM rentals WHERE id = $1
+        `, [id])
+
+        res.send(200)
+
+    }catch(err){
+        console.log(500)
         res.send(500)
     }
 })
