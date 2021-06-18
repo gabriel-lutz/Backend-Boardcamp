@@ -198,6 +198,77 @@ app.put('/customers/:id', async (req,res)=>{
     }
 })
 
+app.get('/rentals', async (req,res)=>{
+    try{
+        const customerIdParam = req.query.customerId
+        const gameIdParam = req.query.gameId
+        let query;
+        let gameQuery;
+        let customerQuery;
+
+        if(customerIdParam){
+            query = await connection.query(`
+                SELECT * FROM rentals WHERE "customerId"=$1
+            `, [customerIdParam])
+        }else if(gameIdParam){
+            query = await connection.query(`
+                SELECT * FROM rentals WHERE "gameId"=$1
+            `, [gameIdParam])
+        }else{
+            query = await connection.query(`
+                SELECT * FROM rentals
+            `)
+        }
+
+        if(gameIdParam){
+            gameQuery = await connection.query(`
+                SELECT games.*, categories.name AS "categoryName" 
+                FROM games 
+                JOIN categories
+                ON games."categoryId" = categories.id
+                WHERE games.id = $1
+            `, [gameIdParam])
+        }else{
+            gameQuery = await connection.query(`
+                SELECT games.*, categories.name AS "categoryName" 
+                FROM games JOIN categories
+                ON games."categoryId" = categories.id
+            `)
+        }
+        
+        if(customerIdParam){
+            customerQuery = await connection.query(`
+                SELECT * 
+                FROM customers
+                WHERE customers.id = $1
+            `, [customerIdParam])
+        }else{
+            customerQuery = await connection.query(`
+                SELECT * FROM customers
+            `)
+        }
+    
+        const gameAndCustomerAddedArray = query.rows.map(r => {
+            const game = gameQuery.rows.find(g => g.id === r.gameId)
+            const customer = customerQuery.rows.find(c=> c.id === r.customerId)
+            return {...r, 
+                games:{id: game.id,
+                       name: game.name,
+                       categoryId: game.categoryId,
+                       categoryName: game.categoryName
+                },
+                customer:{id: customer.id,
+                          name: customer.name}
+            }
+        })
+
+        res.send(gameAndCustomerAddedArray)
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
+
 app.post('/rentals', async (req,res)=>{
     try{
         const {customerId, gameId, daysRented} = req.body
