@@ -88,7 +88,7 @@ app.post('/games', async (req,res)=>{
             res.send(409)
             return;
         }
-        const query = await connection.query(`
+        await connection.query(`
             INSERT INTO games (name, image, "stockTotal", "categoryId", "pricePerDay") 
             VALUES ($1, $2, $3, $4, $5)
             `, [name, image, stockTotal, categoryId, pricePerDay])
@@ -160,7 +160,7 @@ app.post('/customers', async (req,res)=>{
             return;
         }
 
-        const query = await connection.query(`
+        await connection.query(`
             INSERT INTO customers (name, phone, cpf, birthday)
             VALUES ($1,$2,$3,$4)
         `, [name, phone, cpf, birthday])
@@ -187,7 +187,7 @@ app.put('/customers/:id', async (req,res)=>{
             return;
         }
 
-        const query = await connection.query(`
+        await connection.query(`
             UPDATE customers 
             SET (name, phone, cpf, birthday) = ($1,$2,$3,$4)
             WHERE id = $5
@@ -204,66 +204,42 @@ app.get('/rentals', async (req,res)=>{
         const customerIdParam = req.query.customerId
         const gameIdParam = req.query.gameId
         let query;
-        let gameQuery;
-        let customerQuery;
 
         if(customerIdParam){
             query = await connection.query(`
-                SELECT * FROM rentals WHERE "customerId"=$1
+                SELECT rentals.*, 
+                jsonb_build_object('name', customers.name, 'id', customers.id) AS customer,
+                jsonb_build_object('id', games.id, 'name', games.name, 'categoryId', games."categoryId", 'categoryName', categories.name) AS game            
+                FROM rentals 
+                JOIN customers ON rentals."customerId" = customers.id
+                JOIN games ON rentals."gameId" = games.id
+                JOIN categories ON categories.id = games."categoryId"
+                WHERE rentals."customerId" = $1 
             `, [customerIdParam])
         }else if(gameIdParam){
             query = await connection.query(`
-                SELECT * FROM rentals WHERE "gameId"=$1
+                SELECT rentals.*, 
+                jsonb_build_object('name', customers.name, 'id', customers.id) AS customer,
+                jsonb_build_object('id', games.id, 'name', games.name, 'categoryId', games."categoryId", 'categoryName', categories.name) AS game            
+                FROM rentals 
+                JOIN customers ON rentals."customerId" = customers.id
+                JOIN games ON rentals."gameId" = games.id
+                JOIN categories ON categories.id = games."categoryId"
+                WHERE rentals."gameId" = $1 
             `, [gameIdParam])
         }else{
             query = await connection.query(`
-                SELECT * FROM rentals
-            `)
-        }
-
-        if(gameIdParam){
-            gameQuery = await connection.query(`
-                SELECT games.*, categories.name AS "categoryName" 
-                FROM games 
-                JOIN categories
-                ON games."categoryId" = categories.id
-                WHERE games.id = $1
-            `, [gameIdParam])
-        }else{
-            gameQuery = await connection.query(`
-                SELECT games.*, categories.name AS "categoryName" 
-                FROM games JOIN categories
-                ON games."categoryId" = categories.id
-            `)
-        }
-        
-        if(customerIdParam){
-            customerQuery = await connection.query(`
-                SELECT * 
-                FROM customers
-                WHERE customers.id = $1
-            `, [customerIdParam])
-        }else{
-            customerQuery = await connection.query(`
-                SELECT * FROM customers
+                SELECT rentals.*, 
+                jsonb_build_object('name', customers.name, 'id', customers.id) AS customer,
+                jsonb_build_object('id', games.id, 'name', games.name, 'categoryId', games."categoryId", 'categoryName', categories.name) AS game            
+                FROM rentals 
+                JOIN customers ON rentals."customerId" = customers.id
+                JOIN games ON rentals."gameId" = games.id
+                JOIN categories ON categories.id = games."categoryId" 
             `)
         }
     
-        const gameAndCustomerAddedArray = query.rows.map(r => {
-            const game = gameQuery.rows.find(g => g.id === r.gameId)
-            const customer = customerQuery.rows.find(c=> c.id === r.customerId)
-            return {...r, 
-                game:{id: game.id,
-                       name: game.name,
-                       categoryId: game.categoryId,
-                       categoryName: game.categoryName
-                },
-                customer:{id: customer.id,
-                          name: customer.name}
-            }
-        })
-
-        res.send(gameAndCustomerAddedArray)
+        res.send(query.rows)
     }catch(err){
         console.log(err)
         res.send(500)
