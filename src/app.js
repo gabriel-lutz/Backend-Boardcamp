@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import pg from "pg";
+import Joi from "joi"
 
 const app = express();
 app.use(cors());
@@ -136,6 +137,65 @@ app.get('/customers/:id', async (req,res)=>{
     }
 })
 
+const customerSchema = Joi.object({
+    cpf: Joi.string().length(11).pattern(/^[0-9]+$/).required(),
+    phone: Joi.string().min(10).max(11).pattern(/^[0-9]+$/).required(),
+    name: Joi.string().min(1).required(),
+    birthday: Joi.date().less('now').required()
+})
+
+app.post('/customers', async (req,res)=>{
+    try{   
+        const {name, phone, cpf, birthday} = req.body
+        const customersQuery = await connection.query(`
+                SELECT * FROM customers
+            `)
+        if(customerSchema.validate({name, phone, cpf, birthday}).error){
+            res.send(499)
+            return
+        }else if(customersQuery.rows.find(c => c.cpf === cpf)){
+            res.send(409)
+            return;
+        }
+
+        const query = await connection.query(`
+            INSERT INTO customers (name, phone, cpf, birthday)
+            VALUES ($1,$2,$3,$4)
+        `, [name, phone, cpf, birthday])
+        res.send(200)
+
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
+
+app.put('/customers/:id', async (req,res)=>{
+    try{
+        const id = req.params.id   
+        const {name, phone, cpf, birthday} = req.body
+        const customersQuery = await connection.query(`
+                SELECT * FROM customers
+            `)
+        if(customerSchema.validate({name, phone, cpf, birthday}).error){
+            res.send(400)
+            return
+        }else if(customersQuery.rows.find(c => c.cpf === cpf && c.id != id)){
+            res.send(409)
+            return;
+        }
+
+        const query = await connection.query(`
+            UPDATE customers 
+            SET (name, phone, cpf, birthday) = ($1,$2,$3,$4)
+            WHERE id = $5
+        `, [name, phone, cpf, birthday,id])
+        res.send(200)
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
 
 app.listen(4000, ()=>{
     console.log("O servidor está rodando na porta 4000...")
