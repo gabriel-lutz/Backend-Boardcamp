@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import pg from "pg";
 import Joi from "joi"
+import dayjs from "dayjs"
 
 const app = express();
 app.use(cors());
@@ -191,6 +192,70 @@ app.put('/customers/:id', async (req,res)=>{
             WHERE id = $5
         `, [name, phone, cpf, birthday,id])
         res.send(200)
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
+
+app.post('/rentals', async (req,res)=>{
+    try{
+        const {customerId, gameId, daysRented} = req.body
+        const rentDate =  dayjs().format('YYYY-MM-DD');
+        const returnDate = null
+        const delayFee = null
+
+        if(+daysRented < 1){
+            res.send(400)
+            return
+        }
+
+        const customerQuery = await connection.query(`
+            SELECT * 
+            FROM customers 
+            WHERE id = $1
+        `, [customerId])
+
+        if(!customerQuery.rows.length){
+            res.send(400)
+            return
+        }
+
+        const gameQuery = await connection.query(`
+            SELECT * 
+            FROM games 
+            WHERE id = $1
+        `, [gameId])
+
+        if(!gameQuery.rows.length){
+            res.send(400)
+            return
+        }
+
+        const availableQuery = await connection.query(`
+            SELECT * 
+            FROM rentals 
+            WHERE "gameId" = $1
+        `, [gameId])
+
+        if(gameQuery.rows[0].stockTotal <= availableQuery.rows.length){
+            res.send(400)
+            return;
+        }
+
+        const originalPrice = daysRented * gameQuery.rows[0].pricePerDay
+
+        await connection.query(`
+            INSERT INTO rentals ("customerId","gameId","rentDate",
+                                 "daysRented","returnDate","originalPrice",
+                                 "delayFee")
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `, [customerId,gameId,rentDate,
+            daysRented,returnDate,originalPrice,
+            delayFee])
+        
+        res.send(201)
+
     }catch(err){
         console.log(err)
         res.send(500)
