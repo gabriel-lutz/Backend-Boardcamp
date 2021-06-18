@@ -333,6 +333,49 @@ app.post('/rentals', async (req,res)=>{
     }
 })
 
+app.post('/rentals/:id/return', async (req,res)=>{
+    try{
+        const id = req.params.id
+        const query = await connection.query(`
+            SELECT * FROM rentals WHERE id = $1
+        `, [id])
+
+        if(!query.rows.length){
+            res.send(400)
+            return
+        }
+
+        const returnDate = dayjs().format('YYYY-MM-DD')
+        let delayFee
+        const d1 = new Date(query.rows[0].rentDate)
+        const d2 = new Date()
+        const daysPassedSinceRental = (d2.getTime() - d1.getTime())/86400000
+        
+        if(query.rows[0].returnDate !== null){
+            res.send(400)
+            return
+        }
+
+        if(daysPassedSinceRental > query.rows[0].daysRented){
+            delayFee = Math.floor(daysPassedSinceRental-query.rows[0].daysRented) * (query.rows[0].originalPrice / query.rows[0].daysRented)
+        }else{
+            delayFee = '0'
+        }
+
+        await connection.query(`
+            UPDATE rentals
+            SET ("returnDate", "delayFee") = ($1,$2)
+            WHERE id = $3
+        `, [returnDate, delayFee, id])
+
+        res.send(200)
+
+    }catch(err){
+        console.log(err)
+        res.send(500)
+    }
+})
+
 app.listen(4000, ()=>{
     console.log("O servidor está rodando na porta 4000...")
 });
